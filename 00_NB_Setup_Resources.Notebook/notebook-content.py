@@ -22,32 +22,19 @@
 
 # CELL ********************
 
+
 # ═══════════════════════════════════════════════════════════════
 # NOTEBOOK 00_NB_Setup_Resources
 # ═══════════════════════════════════════════════════════════════
+
+# CELLULE 1 ───────────────────────────────────────────────────
 from pyspark.sql.types import *
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 import logging
 
-# Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('healthtek')
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CONFIGURATION ET CONSTANTES
-# ══════════════════════════════════════════════════════════════════════════════
-
-CONFIG = {
-    "BASE_PATH": "Files/bdpm/",
-    "OPENMEDIC_URL": "Files/openmedic/OPEN_MEDIC_2024.CSV",
-    # Note : WINDOWS-1252 est recommandé pour les fichiers BDPM (Accents et Apostrophes)
-    "DEFAULT_ENCODING": "WINDOWS-1252",
-    "AUDIT_COLUMNS": {
-        "TIMESTAMP": "IngestionTimestamp",
-        "SOURCE": "SourceFile"
-    }
-}
 
 # METADATA ********************
 
@@ -58,12 +45,47 @@ CONFIG = {
 
 # CELL ********************
 
-# ══════════════════════════════════════════════════════════════════════════════
-# CELLULE 2 : RÉFÉRENTIEL DES SCHÉMAS (BRONZE)
-# Convention : TOUTES_LES_COLONNES_EN_MAJUSCULES_SNAKE_CASE
-# ══════════════════════════════════════════════════════════════════════════════
 
-# 1. Spécialités (BDPM - Mensuel)
+# CELLULE 2 ───────────────────────────────────────────────────
+WORKSPACE_ID   = "7d0be975-834c-4a8b-94e5-285d539839c6"
+LAKEHOUSE_ID   = "160b09ed-0f10-429d-a4c2-b61aaa24b00e"
+LAKEHOUSE_NAME = "LH_Pharma"
+
+ABFS_ROOT   = (
+    f"abfss://{WORKSPACE_ID}@onelake.dfs.fabric.microsoft.com"
+    f"/{LAKEHOUSE_ID}/Files"
+)
+TABLES_ROOT = (
+    f"abfss://{WORKSPACE_ID}@onelake.dfs.fabric.microsoft.com"
+    f"/{LAKEHOUSE_ID}/Tables/dbo"
+)
+
+CONFIG = {
+    "BASE_PATH"       : f"{ABFS_ROOT}/bdpm/",
+    "OPENMEDIC_URL"   : f"{ABFS_ROOT}/openmedic/OPEN_MEDIC_2024.CSV",
+    "DEFAULT_ENCODING": "WINDOWS-1252",
+    "AUDIT_COLUMNS"   : {
+        "TIMESTAMP": "IngestionTimestamp",
+        "SOURCE"   : "SourceFile"
+    }
+}
+
+logger.info(f"=== CONFIG chargée – Lakehouse : {LAKEHOUSE_NAME} ===")
+logger.info(f"=== ABFS Root   : {ABFS_ROOT} ===")
+logger.info(f"=== TABLES Root : {TABLES_ROOT} ===")
+
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+
+# CELLULE 3 ───────────────────────────────────────────────────
 schema_CIS_bdpm = StructType([
     StructField("CIS", StringType(), True),
     StructField("DENOMINATION", StringType(), True),
@@ -79,7 +101,6 @@ schema_CIS_bdpm = StructType([
     StructField("SURVEILLANCE_RENFORCEE", StringType(), True)
 ])
 
-# 2. Présentations et Prix (BDPM - Quotidien)
 schema_CIS_CIP_bdpm = StructType([
     StructField("CIS", StringType(), True),
     StructField("CIP7", StringType(), True),
@@ -95,8 +116,6 @@ schema_CIS_CIP_bdpm = StructType([
     StructField("INDICATIONS_REMBOURSEMENT", StringType(), True)
 ])
 
-# 3. Ruptures de stock (ANSM - Hebdomadaire) 
-# Note : On force ici les noms originaux (CamelCase) vers MAJUSCULES_SNAKE
 schema_CIS_CIP_DISPO_SPEC = StructType([
     StructField("CIS", StringType(), True),
     StructField("CIP7", StringType(), True),
@@ -108,7 +127,6 @@ schema_CIS_CIP_DISPO_SPEC = StructType([
     StructField("LIEN_ANSM", StringType(), True)
 ])
 
-# 4. OpenMedic (AMELI - Annuel)
 schema_OPEN_MEDIC = StructType([
     StructField("ATC1", StringType(), True),
     StructField("L_ATC1", StringType(), True),
@@ -133,7 +151,6 @@ schema_OPEN_MEDIC = StructType([
     StructField("BSE", StringType(), True)
 ])
 
-# 5. Composition (BDPM - Mensuel)
 schema_CIS_COMPO_bdpm = StructType([
     StructField("CIS", StringType(), True),
     StructField("DESIGNATION_ELEMENT", StringType(), True),
@@ -145,7 +162,6 @@ schema_CIS_COMPO_bdpm = StructType([
     StructField("NUMERO_LIAISON", StringType(), True)
 ])
 
-# 6. Groupes Génériques (BDPM - Mensuel)
 schema_CIS_GENER_bdpm = StructType([
     StructField("ID_GROUPE", StringType(), True),
     StructField("LIBELLE_GROUPE", StringType(), True),
@@ -154,7 +170,6 @@ schema_CIS_GENER_bdpm = StructType([
     StructField("NUMERO_ORDRE", StringType(), True)
 ])
 
-# 7. Avis SMR - Service Médical Rendu (BDPM - Mensuel)
 schema_CIS_HAS_SMR_bdpm = StructType([
     StructField("CIS", StringType(), True),
     StructField("CODE_DOSSIER_HAS", StringType(), True),
@@ -164,7 +179,6 @@ schema_CIS_HAS_SMR_bdpm = StructType([
     StructField("LIBELLE_SMR", StringType(), True)
 ])
 
-# 8. Avis ASMR - Amélioration du Service Médical Rendu (BDPM - Mensuel)
 schema_CIS_HAS_ASMR_bdpm = StructType([
     StructField("CIS", StringType(), True),
     StructField("CODE_DOSSIER_HAS", StringType(), True),
@@ -173,7 +187,7 @@ schema_CIS_HAS_ASMR_bdpm = StructType([
     StructField("VALEUR_ASMR", StringType(), True),
     StructField("LIBELLE_ASMR", StringType(), True)
 ])
-# 9. Conditions de Prescription et Délivrance (Nouveau - Mensuel)
+
 schema_CIS_CPD_bdpm = StructType([
     StructField("CIS", StringType(), True),
     StructField("CONDITION_PRESCRIPTION_DELIVRANCE", StringType(), True)
@@ -188,12 +202,9 @@ schema_CIS_CPD_bdpm = StructType([
 
 # CELL ********************
 
-# === FONCTION 0 : ingest_to_bronze ===
+
+# CELLULE 4 ───────────────────────────────────────────────────
 def ingest_to_bronze(file_path, schema, table_name, encoding=None, separator="\t", has_header="false"):
-    """
-    === CHARGEMENT BRONZE ===
-    Lit les fichiers sources et les sauvegarde en format Delta (Bronze).
-    """
     encoding = encoding or CONFIG["DEFAULT_ENCODING"]
     logger.info(f"=== Ingestion Bronze : {table_name} ===")
     try:
@@ -202,8 +213,7 @@ def ingest_to_bronze(file_path, schema, table_name, encoding=None, separator="\t
             .option("encoding", encoding)
             .option("header", has_header)
             .schema(schema)
-            .csv(file_path)
-            )
+            .csv(file_path))
         df = df.withColumn(CONFIG["AUDIT_COLUMNS"]["TIMESTAMP"], F.current_timestamp())
         df = df.withColumn(CONFIG["AUDIT_COLUMNS"]["SOURCE"], F.lit(file_path))
         df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(table_name)
@@ -219,8 +229,9 @@ def ingest_to_bronze(file_path, schema, table_name, encoding=None, separator="\t
 
 # CELL ********************
 
+
+# CELLULE 5 ───────────────────────────────────────────────────
 def standardize_columns(df):
-    """PILIERS 0 : Normalisation des noms de colonnes (Case Sensitivity)"""
     col_map = {}
     for c in df.columns:
         pascal = "".join([w.capitalize() for w in c.split('_')])
@@ -230,22 +241,12 @@ def standardize_columns(df):
         col_map[c] = final
     try:
         return df.withColumnsRenamed(col_map)
-    except: # Fallback spark < 3.4
+    except:
         for old_c, new_c in col_map.items():
             df = df.withColumnRenamed(old_c, new_c)
         return df
 
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 def handle_technical_normalization(df):
-    """PILIER 1 : Nettoyage des caractères spéciaux techniques"""
     text_cols = [f.name for f in df.schema.fields if isinstance(f.dataType, StringType)]
     for c in text_cols:
         df = df.withColumn(c, F.regexp_replace(F.col(c), "[\u2018\u2019\u201A\u201B]", "'"))
@@ -253,112 +254,67 @@ def handle_technical_normalization(df):
     return df
 
 def apply_default_labels(df):
-    """PILIER 2 : Gestion des valeurs nulles/vides pour les labels"""
     replacements = {"StatutBdm": "Non Renseigné", "CodeStatut": "Disponible", "Titulaire": "Inconnu", "LibelleStatut": "Inconnu"}
     for col_name, val in replacements.items():
         if col_name in df.columns:
             df = df.withColumn(col_name, F.when((F.col(col_name).isNull()) | (F.col(col_name).isin("", "Null", " ")), val).otherwise(F.col(col_name)))
     return df
 
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 def apply_healthtek_aesthetic(df, skip_formatting=False):
-    """PILIER 3 : Esthétique, HTML et Capitalisation"""
     if skip_formatting: return df
     text_cols = [f.name for f in df.schema.fields if isinstance(f.dataType, StringType)]
     sentence_case_cols = ["LibelleAsmr", "LibelleSmr", "Denomination", "LibelleStatut", "StatutBdm", "LibelleGroupe", "NomSubstance", "EtatCommercialisation"]
-    # Detection stricte des acronymes (évite les faux positifs comme Et-ATC-ommercialisation)
     acronym_cols = [c for c in df.columns if any(c.upper().startswith(k) for k in ["CIS", "CIP", "ATC"]) and not c.startswith("L")]
-
     for c in text_cols:
         if c in df.columns:
-            df = df.withColumn(c, F.regexp_replace(F.col(c), "(?i)<br\\s*/?>", " ")) # Nettoyage <br>
-            df = df.withColumn(c, F.regexp_replace(F.col(c), "<[^>]*>", " ")) # Nettoyage HTML
-            df = df.withColumn(c, F.regexp_replace(F.col(c), "(?i)([ldnsjt])\\s*[']\\s*([aeiouyh])", "$1'$2")) # Fix contractions
-            
+            df = df.withColumn(c, F.regexp_replace(F.col(c), "(?i)<br\\s*/?>", " "))
+            df = df.withColumn(c, F.regexp_replace(F.col(c), "<[^>]*>", " "))
+            df = df.withColumn(c, F.regexp_replace(F.col(c), "(?i)([ldnsjt])\\s*[']\\s*([aeiouyh])", "$1'$2"))
             if c in acronym_cols:
                 df = df.withColumn(c, F.upper(F.trim(F.col(c))))
             elif c in sentence_case_cols or len(c) > 15:
-                # Sentence Case (Phrase)
                 df = df.withColumn(c, F.concat(F.upper(F.substring(F.trim(F.col(c)), 1, 1)), F.lower(F.substring(F.trim(F.col(c)), 2, 10000))))
             else:
                 df = df.withColumn(c, F.initcap(F.lower(F.trim(F.col(c)))))
     return df
 
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 def apply_healthtek_scoring(df):
-    """PILIER 4 : Calcul des scores analytiques (SMR/ASMR)"""
     if "ValeurSmr" in df.columns:
         df = df.withColumn("ValeurSmr_Score", F.when(F.col("ValeurSmr").contains("Important"), 1)
-                                            .when(F.col("ValeurSmr").contains("Modér"), 2)
-                                            .when(F.col("ValeurSmr").contains("Faible"), 3)
-                                            .when(F.col("ValeurSmr").contains("Insuffisant"), 4).otherwise(0).cast("integer"))
+                                               .when(F.col("ValeurSmr").contains("Modér"), 2)
+                                               .when(F.col("ValeurSmr").contains("Faible"), 3)
+                                               .when(F.col("ValeurSmr").contains("Insuffisant"), 4).otherwise(0).cast("integer"))
     if "ValeurAsmr" in df.columns:
         df = df.withColumn("TEMP_EXT", F.regexp_extract(F.upper(F.col("ValeurAsmr")), r"\b(IV|III|II|V|I)\b", 1))
         df = df.withColumn("ValeurAsmr_Score", F.when(F.col("TEMP_EXT") == "V", 5)
-                                             .when(F.col("TEMP_EXT") == "IV", 4)
-                                             .when(F.col("TEMP_EXT") == "III", 3)
-                                             .when(F.col("TEMP_EXT") == "II", 2)
-                                             .when(F.col("TEMP_EXT") == "I", 1).otherwise(0).cast("integer")).drop("TEMP_EXT")
+                                                .when(F.col("TEMP_EXT") == "IV", 4)
+                                                .when(F.col("TEMP_EXT") == "III", 3)
+                                                .when(F.col("TEMP_EXT") == "II", 2)
+                                                .when(F.col("TEMP_EXT") == "I", 1).otherwise(0).cast("integer")).drop("TEMP_EXT")
     return df
 
 def convert_healthtek_types(df):
-    """PILIER 5 : Conversion de types et traitement des virgules"""
     int_cols = ["Boites", "Age", "Sexe", "BenReg", "PspSpe", "TopGen", "GenNum", "IdGroupe", "IdentifiantGroupe"]
     for c in int_cols:
         if c in df.columns: df = df.withColumn(c, F.coalesce(F.regexp_replace(F.col(c), ",", ".").cast("integer"), F.lit(0)))
-    
     double_cols = ["PrixMedicament", "PrixPublicFrance", "Rem", "Bse", "Prix"]
     for c in double_cols:
         if c in df.columns: df = df.withColumn(c, F.coalesce(F.regexp_replace(F.col(c), ",", ".").cast("double"), F.lit(0.0)))
-            
     if "TauxRemboursement" in df.columns:
         expr = F.regexp_replace(F.regexp_replace(F.col("TauxRemboursement"), "%", ""), ",", ".").cast("double")
         df = df.withColumn("TauxRemboursement", F.coalesce(expr / F.when(F.col("TauxRemboursement").contains("%"), 100.0).otherwise(1.0), F.lit(0.0)))
-
     date_cols = [c for c in df.columns if any(k in c for k in ["Date", "Avis", "Debut", "MiseJour", "Remise"])]
     for c in date_cols: df = df.withColumn(c, F.coalesce(F.to_date(F.col(c), "dd/MM/yyyy"), F.to_date(F.col(c), "yyyy-MM-dd"), F.to_date(F.col(c), "yyyyMMdd")))
     return df
 
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 def apply_healthtek_padding(df):
-    """PILIER 6 : Padding des IDs et projections finales"""
-    if "CIS" in df.columns: df = df.withColumn("CIS", F.lpad(F.trim(F.col("CIS")).cast("string"), 8, "0"))
+    if "CIS" in df.columns:   df = df.withColumn("CIS",   F.lpad(F.trim(F.col("CIS")).cast("string"),   8, "0"))
     if "CIP13" in df.columns: df = df.withColumn("CIP13", F.lpad(F.trim(F.col("CIP13")).cast("string"), 13, "0"))
-    if "CIP7" in df.columns: df = df.withColumn("CIP7", F.lpad(F.trim(F.col("CIP7")).cast("string"), 7, "0"))
-    if "ATC5" in df.columns: df = df.withColumn("ATC5", F.upper(F.trim(F.col("ATC5"))))
+    if "CIP7" in df.columns:  df = df.withColumn("CIP7",  F.lpad(F.trim(F.col("CIP7")).cast("string"),   7, "0"))
+    if "ATC5" in df.columns:  df = df.withColumn("ATC5",  F.upper(F.trim(F.col("ATC5"))))
     return df.withColumn("Annee_Volume_Ref", F.lit(2024))
 
-# === FONCTION COORDONNATRICE (Version Modulaire) ===
 def apply_healthtek_quality(df, skip_formatting=False, drop_audit=True):
-    """
-    === QUALITÉ HEALTH-TEK : ORCHESTRATION MODULAIRE ===
-    Suit le principe SRP (Single Responsibility Principle).
-    """
     df = standardize_columns(df)
     df = handle_technical_normalization(df)
     df = apply_default_labels(df)
@@ -366,11 +322,73 @@ def apply_healthtek_quality(df, skip_formatting=False, drop_audit=True):
     df = apply_healthtek_scoring(df)
     df = convert_healthtek_types(df)
     df = apply_healthtek_padding(df)
-    
     if drop_audit:
         audit_cols = ["IngestionTimestamp", "SourceFile", "time", "source"]
         df = df.drop(*[c for c in audit_cols if c in df.columns])
     return df
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+
+# CELLULE 6 ───────────────────────────────────────────────────
+def transform_openmedic_demographics(df):
+    df = df.withColumn("Age_Label",
+        F.when(F.col("Age").isin(0, 10, 19), "0-19")
+         .when(F.col("Age").isin(20, 40, 59), "20-59")
+         .when(F.col("Age").isin(60, 80, 99), "60-")
+         .otherwise("Âge Inconnu"))
+    df = df.withColumn("Age_Sort_Order",
+        F.when(F.col("Age_Label") == "0-19",  1)
+         .when(F.col("Age_Label") == "20-59", 2)
+         .when(F.col("Age_Label") == "60-",   3).otherwise(9))
+    df = df.withColumn("Sexe_Label",
+        F.when(F.col("Sexe") == 1, "Homme")
+         .when(F.col("Sexe") == 2, "Femme")
+         .otherwise("Inconnu"))
+    if "ATC5" in df.columns:
+        df = df.withColumn("ATC1", F.substring(F.col("ATC5"), 1, 1))
+    return df
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+
+
+# CELLULE 7 ───────────────────────────────────────────────────
+def process_to_silver(source_table, target_table, key_cols=None, select_cols=None):
+    if spark.catalog.tableExists(source_table):
+        try:
+            df = spark.read.table(source_table)
+            if select_cols:
+                df = df.select(*select_cols)
+            df_clean = apply_healthtek_quality(df)
+            if "dispo_spec" in source_table.lower():
+                if spark.catalog.tableExists("silver_cis_cip"):
+                    mapping_cip = spark.read.table("silver_cis_cip").select("CIS", "CIP7", "CIP13")
+                    df_clean = df_clean.join(mapping_cip, ["CIS", "CIP7"], "left")
+            if "open_medic" in source_table.lower():
+                df_clean = transform_openmedic_demographics(df_clean)
+            if not key_cols:
+                key_cols = ["CIP13"] if "CIP13" in df_clean.columns else ["CIS"] if "CIS" in df_clean.columns else None
+            if key_cols:
+                df_clean = df_clean.dropDuplicates(key_cols)
+            df_clean.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(target_table)
+            logger.info(f"=== Table Silver créée : {target_table} ===")
+        except Exception as e:
+            logger.error(f"=== ERREUR {target_table} : {str(e)} ===")
 
 
 # METADATA ********************
@@ -382,24 +400,18 @@ def apply_healthtek_quality(df, skip_formatting=False, drop_audit=True):
 
 # CELL ********************
 
-def transform_openmedic_demographics(df):
-    """
-    === MAPPING ÂGE ET SEXE ===
-    """
-    df = df.withColumn("Age_Label", 
-        F.when(F.col("AGE").isin(0, 10, 19), "0-19")
-         .when(F.col("AGE").isin(20, 40, 59), "20-59 ")
-         .when(F.col("AGE").isin(60, 80, 99), "60-")
-         .otherwise("Âge Inconnu")
-    )
-    df = df.withColumn("Age_Sort_Order", 
-        F.when(F.col("Age_Label") == "0-19 ", 1)
-         .when(F.col("Age_Label") == "20-59", 2)
-         .when(F.col("Age_Label") == "60-", 3).otherwise(9)
-    )
-    df = df.withColumn("Sexe_Label", F.when(F.col("SEXE") == 1, "Homme").when(F.col("SEXE") == 2, "Femme").otherwise("Inconnu"))
-    if "ATC5" in df.columns: df = df.withColumn("ATC1", F.substring(F.col("ATC5"), 1, 1))
+
+# CELLULE 8 ───────────────────────────────────────────────────
+def compute_silver_metrics(df):
+    win_atc = Window.partitionBy("ATC5")
+    win_cip = Window.partitionBy("CIP13")
+    if all(c in df.columns for c in ["Boites", "Rem"]):
+        df = df.withColumn("CoutMoyenBoite", F.round(F.col("Rem") / F.col("Boites"), 2))
+        df = df.withColumn("DeltaPrixGroupe", F.round(F.max("CoutMoyenBoite").over(win_atc) - F.min("CoutMoyenBoite").over(win_atc), 2))
+        df = df.withColumn("CvConsommation",  F.round((F.stddev("Boites").over(win_cip) / F.avg("Boites").over(win_cip)) * 100, 2))
     return df
+
+logger.info("=== Ressources chargées avec succès ===")
 
 # METADATA ********************
 
@@ -445,38 +457,6 @@ def process_to_silver(source_table, target_table, key_cols=None, select_cols=Non
         except Exception as e:
             logger.error(f"===  ERREUR {target_table} : {str(e)} ===")
 
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
-def compute_silver_metrics(df):
-    """Calcule les indicateurs analytiques avancés."""
-    win_atc = Window.partitionBy("ATC5")
-    win_cip = Window.partitionBy("CIP13")
-
-    if all(c in df.columns for c in ["Boites", "Rem"]):
-        df = df.withColumn("CoutMoyenBoite", F.round(F.col("Rem") / F.col("Boites"), 2))
-        df = df.withColumn("DeltaPrixGroupe", F.round(F.max("CoutMoyenBoite").over(win_atc) - F.min("CoutMoyenBoite").over(win_atc), 2))
-        df = df.withColumn("CvConsommation", F.round((F.stddev("Boites").over(win_cip) / F.avg("Boites").over(win_cip)) * 100, 2))
-
-    return df
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
-logger.info(f"===  Ressources chargées avec succès  ===")
 
 # METADATA ********************
 
